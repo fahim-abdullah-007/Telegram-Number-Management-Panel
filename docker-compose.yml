@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: panel
+      POSTGRES_PASSWORD: panel
+      POSTGRES_DB: telegram_panel
+    ports: ["5432:5432"]
+    volumes: ["panel-data:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U panel -d telegram_panel"], interval: 5s, timeout: 5s, retries: 10 }
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql://panel:panel@postgres:5432/telegram_panel?schema=public
+      JWT_SECRET: ${JWT_SECRET:-development-only-change-me}
+      CLIENT_ORIGIN: http://localhost:5173
+      PORT: 4000
+    ports: ["4000:4000"]
+    depends_on: { postgres: { condition: service_healthy } }
+  client:
+    build: ./client
+    environment: { VITE_API_URL: http://localhost:4000/api }
+    ports: ["5173:5173"]
+    depends_on: [server]
+volumes:
+  panel-data:

@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+enum NumberStatus {
+  AVAILABLE
+  ASSIGNED
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  EXPIRED
+}
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  DISCONNECTED
+  RESTRICTED
+}
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique
+  passwordHash String
+  name String
+  role Role @default(VIEWER)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  logs ActivityLog[]
+  apiKeys ApiKey[]
+}
+
+model ApiKey {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name String
+  keyPrefix String
+  keyHash String @unique
+  scopes String[]
+  status ApiKeyStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastUsedAt DateTime?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+model Number {
+  id String @id @default(uuid()) @db.Uuid
+  country String
+  countryCode String
+  phoneNumber String @unique
+  provider String
+  status NumberStatus @default(AVAILABLE)
+  telegramLinked Boolean @default(false)
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastActivityAt DateTime?
+  account TelegramAccount?
+  @@index([country, status])
+  @@index([createdAt])
+}
+model TelegramAccount {
+  id String @id @default(uuid()) @db.Uuid
+  numberId String @unique @db.Uuid
+  username String?
+  telegramUserId String?
+  displayName String?
+  status AccountStatus @default(INACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastActiveAt DateTime?
+  number Number @relation(fields: [numberId], references: [id], onDelete: Cascade)
+  sessions Session[]
+}
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  accountId String @db.Uuid
+  status SessionStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastSeenAt DateTime?
+  account TelegramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId, status])
+}
+model ActivityLog {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  action String
+  resource String
+  resourceId String?
+  ipAddress String?
+  result String
+  createdAt DateTime @default(now())
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([createdAt])
+  @@index([resource, resourceId])
+}
